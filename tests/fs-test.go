@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"flag"
 	"fmt"
 	"github.com/cbocovic/chordFS"
@@ -28,12 +29,12 @@ func main() {
 
 		me := new(fs.FileSystem)
 		startaddr = fmt.Sprintf("127.0.0.1:%d", start)
-		me = fs.Create(fmt.Sprintf("~/FS/%d/", start), startaddr)
+		me = fs.Create(fmt.Sprintf("/home/bocovich/FS/%d/", start), startaddr)
 		list[0] = me
 	} else {
 		me := new(fs.FileSystem)
 		startaddr = fmt.Sprintf("127.0.0.1:%d", start)
-		me = fs.Join(fmt.Sprintf("~/FS/%d/", start), startaddr, "127.0.0.1:8888")
+		me = fs.Join(fmt.Sprintf("/home/bocovich/FS/%d/", start), startaddr, "127.0.0.1:8888")
 		list[0] = me
 	}
 
@@ -42,11 +43,12 @@ func main() {
 		time.Sleep(time.Second)
 		node := new(fs.FileSystem)
 		addr := fmt.Sprintf("127.0.0.1:%d", start+i)
-		node = fs.Join(fmt.Sprintf("~/FS/%d/", start), addr, startaddr)
+		node = fs.Join(fmt.Sprintf("/home/bocovich/FS/%d/", start+i), addr, startaddr)
 		list[i] = node
 		fmt.Printf("Joined server: %s.\n", addr)
 	}
 	//block until receive input
+	fs.Store(sha256.Sum256([]byte("WOOO")), "/home/bocovich/out", fmt.Sprintf("127.0.0.1:%d", start))
 Loop:
 	for {
 		var cmd string
@@ -75,6 +77,8 @@ Loop:
 				node := list[port-start]
 				fmt.Printf("\n%s", node.ShowSucc())
 			}
+		case cmd == "send":
+			fs.Store(sha256.Sum256([]byte("WOOO")), "/home/bocovich/a1.pdf", fmt.Sprintf("127.0.0.1:%d", start))
 		case err == io.EOF:
 			break Loop
 		}

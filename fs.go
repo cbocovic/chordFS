@@ -4,7 +4,8 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"github.com/cbocovic/chord"
-	//"io/ioutil"
+	//"io"
+	"os"
 )
 
 const (
@@ -19,12 +20,30 @@ type FileSystem struct {
 	addr string
 }
 
+//error checking function
+func checkError(err error) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Fatal error: %s\n", err.Error())
+	}
+}
+
 func Create(home string, addr string) *FileSystem {
 	me := new(FileSystem)
 	me.node = chord.Create(addr)
+	if me.node == nil {
+		return nil
+	}
 	me.home = home
 	me.mirror = fmt.Sprintf("%s/mirrored", home)
 	me.addr = addr
+	//make directories
+	err := os.MkdirAll(me.home, 0755)
+	err = os.MkdirAll(me.mirror, 0755)
+	fmt.Printf("made directory %s.\n", me.home)
+	if err != nil {
+		checkError(err)
+		return nil
+	}
 
 	me.node.Register(code, me)
 	return me
@@ -33,9 +52,22 @@ func Create(home string, addr string) *FileSystem {
 func Join(home string, myaddr string, addr string) *FileSystem {
 	me := new(FileSystem)
 	me.node = chord.Join(myaddr, addr)
+	if me.node == nil {
+		return nil
+	}
+
 	me.home = home
 	me.mirror = fmt.Sprintf("%s/mirrored", home)
 	me.addr = myaddr
+
+	err := os.MkdirAll(me.home, 0755)
+	err = os.MkdirAll(me.mirror, 0755)
+	fmt.Printf("made directory %s.\n", me.home)
+	if err != nil {
+		checkError(err)
+		return nil
+	}
+	me.node.Register(code, me)
 	return me
 }
 
@@ -49,9 +81,9 @@ func (fs *FileSystem) Notify(id []byte, myid []byte) string {
 
 //Message is part of the ChordApp interface and will allow chord
 //to forward messages to the application
-func (fs *FileSystem) Message(addr string, data string) string {
+func (fs *FileSystem) Message(data []byte) []byte {
 	//TODO: send to appropriate parsing function
-	return "tmp"
+	return fs.parseMessage(data)
 }
 
 //Store will store a file located at path in the DHT (under key) by
@@ -59,10 +91,24 @@ func (fs *FileSystem) Message(addr string, data string) string {
 func Store(key [sha256.Size]byte, path string, addr string) error {
 	//TODO: send file to appropriate node
 	//do a lookup of the key
-	targetip, err := chord.Lookup(key, addr)
+	ipaddr, err := chord.Lookup(key, addr)
+
+	file, err := os.Open(path)
+	defer file.Close()
+	document := make([]byte, 4096)
+	n, err := file.Read(document)
+	checkError(err)
+	if err != nil {
+		return err
+	}
 
 	//create message to send to target ip
-	msg := getstoreMsg(key, []byte(path))
+	fmt.Printf("Making store message with key=%s and doc=%s.\n", string(key[:32]), string(document[:n]))
+	msg := getstoreMsg(key, document[:n-1])
+
+	//send message TODO: check reply for errors
+	fmt.Printf("Sending store message.\n")
+	_, err = chord.Send(msg, ipaddr)
 
 	return err
 
@@ -77,7 +123,14 @@ func Fetch(key []byte, path string, addr string) {
 
 //saves the file to the node's home directory
 func (me *FileSystem) save(key []byte, document []byte) {
-	//TODO: save to file
+	fmt.Printf("saving... ")
+	file, err := os.Create(fmt.Sprintf("%s/%x", me.home, string(key)))
+	checkError(err)
+	_, err = file.Write(document)
+	checkError(err)
+	fmt.Printf("saved.\n")
+
+	file.Close()
 
 }
 
