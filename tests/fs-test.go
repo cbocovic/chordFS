@@ -31,6 +31,7 @@ func main() {
 		startaddr = fmt.Sprintf("127.0.0.1:%d", start)
 		me = fs.Create(fmt.Sprintf("/home/bocovich/FS/%d/", start), startaddr)
 		list[0] = me
+		fs.Store(sha256.Sum256([]byte("WOOO")), "/home/bocovich/out", fmt.Sprintf("127.0.0.1:%d", start))
 	} else {
 		me := new(fs.FileSystem)
 		startaddr = fmt.Sprintf("127.0.0.1:%d", start)
@@ -48,7 +49,6 @@ func main() {
 		fmt.Printf("Joined server: %s.\n", addr)
 	}
 	//block until receive input
-	fs.Store(sha256.Sum256([]byte("WOOO")), "/home/bocovich/out", fmt.Sprintf("127.0.0.1:%d", start))
 Loop:
 	for {
 		var cmd string

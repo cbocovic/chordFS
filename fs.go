@@ -73,9 +73,39 @@ func Join(home string, myaddr string, addr string) *FileSystem {
 
 //Notify is part of the ChordApp interface and will update the
 //application if its predecessor changes
-func (fs *FileSystem) Notify(id []byte, myid []byte) string {
-	//TODO: relocate all files in space
-	return "tmp"
+func (me *FileSystem) Notify(id [sha256.Size]byte, myid [sha256.Size]byte) {
+	fmt.Printf("FS %s notified!\n", me.addr)
+	dir, err := os.Open(me.home)
+	checkError(err)
+	if err != nil {
+		return
+	}
+
+	names, err := dir.Readdirnames(0)
+	checkError(err)
+	if err != nil {
+		return
+	}
+
+	fmt.Printf("FS %s has %d files.\n", me.addr, len(names))
+	for _, name := range names {
+		fmt.Printf("FS %s found file %x.\n", me.addr, []byte(name))
+		var key [sha256.Size]byte
+		if len(name) < sha256.Size {
+			continue
+		}
+		copy(key[:], []byte(name)[:sha256.Size])
+		if chord.InRange(id, key, myid) {
+			fmt.Printf("Relocating file... ")
+			err := Store(key, fmt.Sprintf("%s/%s", me.home, name), me.addr)
+			if err != nil {
+				fmt.Printf("error: ")
+				checkError(err)
+			} else {
+				fmt.Printf("done.\n")
+			}
+		}
+	}
 
 }
 
@@ -89,14 +119,22 @@ func (fs *FileSystem) Message(data []byte) []byte {
 //contacting the node at addr
 func Store(key [sha256.Size]byte, path string, addr string) error {
 	//do a lookup of the key
+	fmt.Printf("storing... \n")
 	ipaddr, err := chord.Lookup(key, addr)
+	fmt.Printf("belongs to %s.\n", ipaddr)
 
 	file, err := os.Open(path)
+	checkError(err)
+	if err != nil {
+		fmt.Printf("error here (0)\n")
+		return err
+	}
 	defer file.Close()
 	document := make([]byte, 4096)
 	n, err := file.Read(document)
 	checkError(err)
 	if err != nil {
+		fmt.Printf("error here (1)\n")
 		return err
 	}
 
@@ -107,6 +145,9 @@ func Store(key [sha256.Size]byte, path string, addr string) error {
 	//send message TODO: check reply for errors
 	fmt.Printf("Sending store message.\n")
 	_, err = chord.Send(msg, ipaddr)
+	if err != nil {
+		fmt.Printf("error here (2)\n")
+	}
 
 	return err
 
@@ -148,7 +189,7 @@ func Fetch(key [sha256.Size]byte, path string, addr string) error {
 //saves the file to the node's home directory
 func (me *FileSystem) save(key []byte, document []byte) {
 	fmt.Printf("saving... ")
-	file, err := os.Create(fmt.Sprintf("%s/%x", me.home, string(key)))
+	file, err := os.Create(fmt.Sprintf("%s/%s", me.home, string(key)))
 	checkError(err)
 	_, err = file.Write(document)
 	checkError(err)
@@ -162,8 +203,7 @@ func (me *FileSystem) save(key []byte, document []byte) {
 func (me *FileSystem) load(key [sha256.Size]byte) []byte {
 
 	document := make([]byte, 4096)
-	filename := fmt.Sprintf("%x", key)
-	file, err := os.Open(fmt.Sprintf("%s/%s", me.home, filename))
+	file, err := os.Open(fmt.Sprintf("%s/%s", me.home, string(key[:sha256.Size])))
 	defer file.Close()
 	checkError(err)
 	if err != nil {
