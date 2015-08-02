@@ -35,6 +35,33 @@ func getstoreMsg(key [sha256.Size]byte, document []byte) []byte {
 	return data
 }
 
+func getfetchMsg(key [sha256.Size]byte) []byte {
+
+	msg := new(NetworkMessage)
+	msg.Proto = proto.Uint32(2)
+	appMsg := new(AppMessage)
+	fsMsg := new(AppMessage_FileSystemMessage)
+	command := AppMessage_Command(AppMessage_Command_value["FETCH"])
+	fsMsg.Cmd = &command
+	fetchMsg := new(FetchMessage)
+	fetchMsg.Key = proto.String(string(key[:sha256.Size]))
+	fsMsg.Fmsg = fetchMsg
+	appMsg.Msg = fsMsg
+
+	appdata, err := proto.Marshal(appMsg)
+	if err != nil {
+		log.Fatal("marshaling error: ", err)
+	}
+	msg.Msg = proto.String(string(appdata))
+
+	data, err := proto.Marshal(msg)
+	if err != nil {
+		log.Fatal("marshaling error: ", err)
+	}
+
+	return data
+}
+
 func nullMsg() []byte {
 	msg := new(NetworkMessage)
 	msg.Proto = proto.Uint32(2)
@@ -62,7 +89,12 @@ func (fs *FileSystem) parseMessage(data []byte) []byte {
 	cmd := int32(fsmsg.GetCmd())
 	switch {
 	case cmd == AppMessage_Command_value["FETCH"]:
-		return nullMsg()
+		fmt.Printf("Received fetch message (%s)", fs.addr)
+		fmsg := fsmsg.GetFmsg()
+		var key [sha256.Size]byte
+		copy(key[:], []byte(fmsg.GetKey()))
+		doc := fs.load(key)
+		return getstoreMsg(key, doc)
 	case cmd == AppMessage_Command_value["STORE"]:
 		fmt.Printf("Received store message (%s)", fs.addr)
 		smsg := fsmsg.GetSmsg()
@@ -75,4 +107,43 @@ func (fs *FileSystem) parseMessage(data []byte) []byte {
 	}
 	fmt.Printf("No matching commands.\n")
 	return nullMsg()
+}
+
+func parseDoc(data []byte) []byte {
+
+	msg := new(AppMessage)
+
+	err := proto.Unmarshal(data, msg)
+	checkError(err)
+	if err != nil {
+		fmt.Printf("Uh oh in fs parse message of node.\n")
+		return nil
+	}
+
+	fsmsg := msg.GetMsg()
+	smsg := fsmsg.GetSmsg()
+	doc := smsg.GetDocument()
+	return []byte(doc)
+
+}
+
+//parseHeader strips the Chord overlay layer off the message
+func parseHeader(data []byte) []byte {
+
+	msg := new(NetworkMessage)
+
+	err := proto.Unmarshal(data, msg)
+	checkError(err)
+	if err != nil {
+		fmt.Printf("Uh oh in header parse message of node.\n")
+		return make([]byte, 0)
+	}
+
+	protocol := msg.GetProto()
+	if byte(protocol) != code {
+		fmt.Printf("Uh oh in header parse message of node.\n")
+		return make([]byte, 0)
+	}
+
+	return []byte(msg.GetMsg())
 }

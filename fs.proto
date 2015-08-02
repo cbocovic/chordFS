@@ -3,7 +3,11 @@ package fs;
 message StoreMessage {
 	required string key = 1;
 	required string document = 2;
-	}
+}
+
+message FetchMessage {
+	required string key = 1;
+}
 
 message NetworkMessage {
 	required uint32 proto = 1;
@@ -23,5 +27,6 @@ message AppMessage {
 	message FileSystemMessage {
 		required Command cmd = 1;
 		optional StoreMessage smsg = 2;
+		optional FetchMessage fmsg = 3;
 	}
 }

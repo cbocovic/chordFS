@@ -77,8 +77,8 @@ Loop:
 				node := list[port-start]
 				fmt.Printf("\n%s", node.ShowSucc())
 			}
-		case cmd == "send":
-			fs.Store(sha256.Sum256([]byte("WOOO")), "/home/bocovich/a1.pdf", fmt.Sprintf("127.0.0.1:%d", start))
+		case cmd == "fetch":
+			fs.Fetch(sha256.Sum256([]byte("WOOO")), "tmp.out", fmt.Sprintf("127.0.0.1:%d", start))
 		case err == io.EOF:
 			break Loop
 		}

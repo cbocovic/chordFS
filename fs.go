@@ -82,14 +82,12 @@ func (fs *FileSystem) Notify(id []byte, myid []byte) string {
 //Message is part of the ChordApp interface and will allow chord
 //to forward messages to the application
 func (fs *FileSystem) Message(data []byte) []byte {
-	//TODO: send to appropriate parsing function
 	return fs.parseMessage(data)
 }
 
 //Store will store a file located at path in the DHT (under key) by
 //contacting the node at addr
 func Store(key [sha256.Size]byte, path string, addr string) error {
-	//TODO: send file to appropriate node
 	//do a lookup of the key
 	ipaddr, err := chord.Lookup(key, addr)
 
@@ -116,8 +114,34 @@ func Store(key [sha256.Size]byte, path string, addr string) error {
 
 //Fetch will retrieve a file with key specified by key from the DHT and
 //save it to path by contacting the node at addr
-func Fetch(key []byte, path string, addr string) {
-	//TODO: find file from appropriate node
+func Fetch(key [sha256.Size]byte, path string, addr string) error {
+	ipaddr, err := chord.Lookup(key, addr)
+
+	//create message to send to target ip
+	fmt.Printf("Making fetch message with key=%s.\n", string(key[:32]))
+	msg := getfetchMsg(key)
+
+	fmt.Printf("Sending store message.\n")
+	reply, err := chord.Send(msg, ipaddr)
+	if err != nil {
+		return err
+	}
+
+	reply = parseHeader(reply)
+	document := parseDoc(reply)
+
+	file, err := os.Create(path)
+	checkError(err)
+	defer file.Close()
+	fmt.Printf("Writing to file... ")
+	_, err = file.Write(document)
+	checkError(err)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("done.\n")
+
+	return err
 
 }
 
@@ -135,9 +159,23 @@ func (me *FileSystem) save(key []byte, document []byte) {
 }
 
 //loads a file from the node's home directory
-func (me *FileSystem) load(key []byte) string {
-	//TODO: loads file
-	return "tmp"
+func (me *FileSystem) load(key [sha256.Size]byte) []byte {
+
+	document := make([]byte, 4096)
+	filename := fmt.Sprintf("%x", key)
+	file, err := os.Open(fmt.Sprintf("%s/%s", me.home, filename))
+	defer file.Close()
+	checkError(err)
+	if err != nil {
+		return document
+	}
+	n, err := file.Read(document)
+	checkError(err)
+	if err != nil {
+		return document
+	}
+
+	return document[:n]
 }
 
 //exits cleanly (removes all files for now)
