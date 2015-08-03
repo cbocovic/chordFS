@@ -71,6 +71,27 @@ func Join(home string, myaddr string, addr string) *FileSystem {
 	return me
 }
 
+//Extend is similar to Join and Create, but instead takes as argument
+//a ChordNode structure
+func Extend(home string, addr string, node *chord.ChordNode) *FileSystem {
+	me := new(FileSystem)
+	me.node = node
+
+	me.home = home
+	me.mirror = fmt.Sprintf("%s/mirrored", home)
+	me.addr = addr
+
+	err := os.MkdirAll(me.home, 0755)
+	err = os.MkdirAll(me.mirror, 0755)
+	fmt.Printf("made directory %s.\n", me.home)
+	if err != nil {
+		checkError(err)
+		return nil
+	}
+	me.node.Register(code, me)
+	return me
+}
+
 //Notify is part of the ChordApp interface and will update the
 //application if its predecessor changes
 func (me *FileSystem) Notify(id [sha256.Size]byte, myid [sha256.Size]byte) {
