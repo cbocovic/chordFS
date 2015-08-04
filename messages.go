@@ -89,14 +89,15 @@ func (fs *FileSystem) parseMessage(data []byte) []byte {
 	cmd := int32(fsmsg.GetCmd())
 	switch {
 	case cmd == AppMessage_Command_value["FETCH"]:
-		fmt.Printf("Received fetch message (%s)", fs.addr)
 		fmsg := fsmsg.GetFmsg()
 		var key [sha256.Size]byte
 		copy(key[:], []byte(fmsg.GetKey()))
-		doc := fs.load(key)
+		doc, err := fs.load(key)
+		if err != nil {
+			return nullMsg()
+		}
 		return getstoreMsg(key, doc)
 	case cmd == AppMessage_Command_value["STORE"]:
-		fmt.Printf("Received store message (%s)", fs.addr)
 		smsg := fsmsg.GetSmsg()
 		key := []byte(smsg.GetKey())
 		doc := []byte(smsg.GetDocument())
@@ -128,7 +129,7 @@ func parseDoc(data []byte) []byte {
 }
 
 //parseHeader strips the Chord overlay layer off the message
-func parseHeader(data []byte) []byte {
+func parseHeader(data []byte) ([]byte, error) {
 
 	msg := new(NetworkMessage)
 
@@ -136,14 +137,14 @@ func parseHeader(data []byte) []byte {
 	checkError(err)
 	if err != nil {
 		fmt.Printf("Uh oh in header parse message of node.\n")
-		return make([]byte, 0)
+		return make([]byte, 0), err
 	}
 
 	protocol := msg.GetProto()
 	if byte(protocol) != code {
 		fmt.Printf("Uh oh in header parse message of node.\n")
-		return make([]byte, 0)
+		return make([]byte, 0), err
 	}
 
-	return []byte(msg.GetMsg())
+	return []byte(msg.GetMsg()), nil
 }

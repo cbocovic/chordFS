@@ -160,11 +160,9 @@ func Store(key [sha256.Size]byte, path string, addr string) error {
 	}
 
 	//create message to send to target ip
-	fmt.Printf("Making store message with key=%s and doc=%s.\n", string(key[:32]), string(document[:n]))
 	msg := getstoreMsg(key, document[:n-1])
 
 	//send message TODO: check reply for errors
-	fmt.Printf("Sending store message.\n")
 	_, err = chord.Send(msg, ipaddr)
 	if err != nil {
 		fmt.Printf("error here (2)\n")
@@ -180,20 +178,24 @@ func Fetch(key [sha256.Size]byte, path string, addr string) error {
 	ipaddr, err := chord.Lookup(key, addr)
 
 	//create message to send to target ip
-	fmt.Printf("Making fetch message with key=%s.\n", string(key[:32]))
 	msg := getfetchMsg(key)
 
-	fmt.Printf("Sending store message.\n")
 	reply, err := chord.Send(msg, ipaddr)
 	if err != nil {
 		return err
 	}
 
-	reply = parseHeader(reply)
+	reply, err = parseHeader(reply)
+	if err != nil {
+		return err
+	}
 	document := parseDoc(reply)
 
 	file, err := os.Create(path)
 	checkError(err)
+	if err != nil {
+		return err
+	}
 	defer file.Close()
 	fmt.Printf("Writing to file... ")
 	_, err = file.Write(document)
@@ -221,22 +223,22 @@ func (me *FileSystem) save(key []byte, document []byte) {
 }
 
 //loads a file from the node's home directory
-func (me *FileSystem) load(key [sha256.Size]byte) []byte {
+func (me *FileSystem) load(key [sha256.Size]byte) ([]byte, error) {
 
 	document := make([]byte, 4096)
 	file, err := os.Open(fmt.Sprintf("%s/%s", me.home, string(key[:sha256.Size])))
 	defer file.Close()
 	checkError(err)
 	if err != nil {
-		return document
+		return document, err
 	}
 	n, err := file.Read(document)
 	checkError(err)
 	if err != nil {
-		return document
+		return document, err
 	}
 
-	return document[:n]
+	return document[:n], nil
 }
 
 //exits cleanly (removes all files for now)
