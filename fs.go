@@ -18,6 +18,9 @@ type FileSystem struct {
 
 	node *chord.ChordNode
 	addr string
+
+	//testing purposes only
+	malicious byte
 }
 
 //error checking function
@@ -46,6 +49,8 @@ func Create(home string, addr string) *FileSystem {
 	}
 
 	me.node.Register(code, me)
+	//experimental
+	me.malicious = false
 	return me
 }
 
@@ -68,6 +73,8 @@ func Join(home string, myaddr string, addr string) *FileSystem {
 		return nil
 	}
 	me.node.Register(code, me)
+	//experimental
+	me.malicious = false
 	return me
 }
 
@@ -259,4 +266,9 @@ func (fs *FileSystem) ShowFingers() string {
 
 func (fs *FileSystem) ShowSucc() string {
 	return fs.node.ShowSucc()
+}
+
+//experimental purposes only
+func (fs *FilSystem) MakeMalicious() {
+	fs.malicious = true
 }

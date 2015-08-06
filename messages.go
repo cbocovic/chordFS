@@ -96,6 +96,11 @@ func (fs *FileSystem) parseMessage(data []byte) []byte {
 		if err != nil {
 			return nullMsg()
 		}
+		//experiment purposes
+		if fs.malicious {
+			fmt.Printf("Muahahaha malicious server.\n")
+			return nullMsg()
+		}
 		return getstoreMsg(key, doc)
 	case cmd == AppMessage_Command_value["STORE"]:
 		smsg := fsmsg.GetSmsg()
