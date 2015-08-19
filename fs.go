@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/cbocovic/chord"
 	//"io"
+	"encoding/base32"
 	"os"
 )
 
@@ -20,7 +21,7 @@ type FileSystem struct {
 	addr string
 
 	//testing purposes only
-	malicious byte
+	malicious bool
 }
 
 //error checking function
@@ -101,8 +102,8 @@ func Extend(home string, addr string, node *chord.ChordNode) *FileSystem {
 
 //Notify is part of the ChordApp interface and will update the
 //application if its predecessor changes
-func (me *FileSystem) Notify(id [sha256.Size]byte, myid [sha256.Size]byte) {
-	fmt.Printf("FS %s notified!\n", me.addr)
+func (me *FileSystem) Notify(id [sha256.Size]byte, myid [sha256.Size]byte, addr string) {
+	//fmt.Printf("FS %s notified!\n", me.addr)
 	dir, err := os.Open(me.home)
 	checkError(err)
 	if err != nil {
@@ -115,23 +116,40 @@ func (me *FileSystem) Notify(id [sha256.Size]byte, myid [sha256.Size]byte) {
 		return
 	}
 
-	fmt.Printf("FS %s has %d files.\n", me.addr, len(names))
+	//fmt.Printf("FS %s has %d files.\n", me.addr, len(names))
 	for _, name := range names {
-		fmt.Printf("FS %s found file %x.\n", me.addr, []byte(name))
+		//fmt.Printf("FS %s found file %s.\n", me.addr, name)
 		var key [sha256.Size]byte
-		if len(name) < sha256.Size {
+		decoded, err := base32.StdEncoding.DecodeString(name)
+		if err != nil {
+			//fmt.Printf("file was not encoded.\n")
 			continue
 		}
-		copy(key[:], []byte(name)[:sha256.Size])
+		copy(key[:], decoded[:sha256.Size])
 		if chord.InRange(id, key, myid) {
-			fmt.Printf("Relocating file... ")
-			err := Store(key, fmt.Sprintf("%s/%s", me.home, name), me.addr)
+			//transfer file.
+			file, err := os.Open(fmt.Sprintf("%s/%s", me.home, name))
+			checkError(err)
 			if err != nil {
-				fmt.Printf("error: ")
 				checkError(err)
-			} else {
-				fmt.Printf("done.\n")
 			}
+			defer file.Close()
+			document := make([]byte, 4096)
+			n, err := file.Read(document)
+			checkError(err)
+			if err != nil {
+				checkError(err)
+			}
+
+			//create message to send to target ip
+			msg := getstoreMsg(key, document[:n])
+
+			//send message TODO: check reply for errors
+			_, err = chord.Send(msg, addr)
+			if err != nil {
+				checkError(err)
+			}
+
 		}
 	}
 
@@ -147,9 +165,8 @@ func (fs *FileSystem) Message(data []byte) []byte {
 //contacting the node at addr
 func Store(key [sha256.Size]byte, path string, addr string) error {
 	//do a lookup of the key
-	fmt.Printf("storing... \n")
+	//fmt.Printf("storing key %x... \n", key)
 	ipaddr, err := chord.Lookup(key, addr)
-	fmt.Printf("belongs to %s.\n", ipaddr)
 
 	file, err := os.Open(path)
 	checkError(err)
@@ -167,7 +184,7 @@ func Store(key [sha256.Size]byte, path string, addr string) error {
 	}
 
 	//create message to send to target ip
-	msg := getstoreMsg(key, document[:n-1])
+	msg := getstoreMsg(key, document[:n])
 
 	//send message TODO: check reply for errors
 	_, err = chord.Send(msg, ipaddr)
@@ -218,12 +235,11 @@ func Fetch(key [sha256.Size]byte, path string, addr string) error {
 
 //saves the file to the node's home directory
 func (me *FileSystem) save(key []byte, document []byte) {
-	fmt.Printf("saving... ")
-	file, err := os.Create(fmt.Sprintf("%s/%s", me.home, string(key)))
+	name := base32.StdEncoding.EncodeToString(key)
+	file, err := os.Create(fmt.Sprintf("%s/%s", me.home, name))
 	checkError(err)
 	_, err = file.Write(document)
 	checkError(err)
-	fmt.Printf("saved.\n")
 
 	file.Close()
 
@@ -233,7 +249,8 @@ func (me *FileSystem) save(key []byte, document []byte) {
 func (me *FileSystem) load(key [sha256.Size]byte) ([]byte, error) {
 
 	document := make([]byte, 4096)
-	file, err := os.Open(fmt.Sprintf("%s/%s", me.home, string(key[:sha256.Size])))
+	name := base32.StdEncoding.EncodeToString(key[:])
+	file, err := os.Open(fmt.Sprintf("%s/%s", me.home, name))
 	defer file.Close()
 	checkError(err)
 	if err != nil {
@@ -269,6 +286,6 @@ func (fs *FileSystem) ShowSucc() string {
 }
 
 //experimental purposes only
-func (fs *FilSystem) MakeMalicious() {
+func (fs *FileSystem) MakeMalicious() {
 	fs.malicious = true
 }

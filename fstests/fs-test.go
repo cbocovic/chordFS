@@ -29,13 +29,13 @@ func main() {
 
 		me := new(fs.FileSystem)
 		startaddr = fmt.Sprintf("127.0.0.1:%d", start)
-		me = fs.Create(fmt.Sprintf("/home/bocovich/FS/%d/", start), startaddr)
+		me = fs.Create(fmt.Sprintf("/home/cbocovic/FS/%d/", start), startaddr)
 		list[0] = me
-		fs.Store(sha256.Sum256([]byte("WOOO")), "/home/bocovich/out", fmt.Sprintf("127.0.0.1:%d", start))
+		fs.Store(sha256.Sum256([]byte("WOOO")), "/home/cbocovic/index.php", fmt.Sprintf("127.0.0.1:%d", start))
 	} else {
 		me := new(fs.FileSystem)
 		startaddr = fmt.Sprintf("127.0.0.1:%d", start)
-		me = fs.Join(fmt.Sprintf("/home/bocovich/FS/%d/", start), startaddr, "127.0.0.1:8888")
+		me = fs.Join(fmt.Sprintf("/home/cbocovic/FS/%d/", start), startaddr, "127.0.0.1:8888")
 		list[0] = me
 	}
 
@@ -44,7 +44,7 @@ func main() {
 		time.Sleep(time.Second)
 		node := new(fs.FileSystem)
 		addr := fmt.Sprintf("127.0.0.1:%d", start+i)
-		node = fs.Join(fmt.Sprintf("/home/bocovich/FS/%d/", start+i), addr, startaddr)
+		node = fs.Join(fmt.Sprintf("/home/cbocovic/FS/%d/", start+i), addr, startaddr)
 		list[i] = node
 		fmt.Printf("Joined server: %s.\n", addr)
 	}
