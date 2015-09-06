@@ -110,21 +110,21 @@ func (fs *FileSystem) parseMessage(data []byte) []byte {
 	return nullMsg()
 }
 
-func parseDoc(data []byte) []byte {
+func parseDoc(data []byte) ([]byte, error) {
 
 	msg := new(AppMessage)
 
 	err := proto.Unmarshal(data, msg)
 	checkError(err)
 	if err != nil {
-		fmt.Printf("Uh oh in fs parse message of node.\n")
-		return nil
+		fmt.Printf("Uh oh in fs parse doc of node.\n")
+		return nil, err
 	}
 
 	fsmsg := msg.GetMsg()
 	smsg := fsmsg.GetSmsg()
 	doc := smsg.GetDocument()
-	return []byte(doc)
+	return []byte(doc), nil
 
 }
 

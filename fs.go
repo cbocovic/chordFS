@@ -189,7 +189,10 @@ func Fetch(key [sha256.Size]byte, path string, addr string) error {
 	if err != nil {
 		return err
 	}
-	document := parseDoc(reply)
+	document, err := parseDoc(reply)
+	if err != nil {
+		return err
+	}
 
 	file, err := os.Create(path)
 	checkError(err)
