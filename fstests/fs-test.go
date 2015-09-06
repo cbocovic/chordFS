@@ -1,41 +1,43 @@
 package main
 
 import (
-	"crypto/sha256"
 	"flag"
 	"fmt"
+	//"github.com/cbocovic/chord"
 	"github.com/cbocovic/chordFS"
 	"io"
-	"runtime"
+	//"runtime"
 	"time"
 )
 
 func main() {
-	runtime.GOMAXPROCS(runtime.NumCPU())
+	//runtime.GOMAXPROCS(runtime.NumCPU())
 
 	var startaddr string
 
 	//set up flags
-	numPtr := flag.Int("num", 5, "the size of the DHT you wish to test")
-	startPtr := flag.Int("start", 8888, "port number to start from")
+	numPtr := flag.Int("num", 1, "the size of the DHT you wish to test")
+	startPtr := flag.Int("start", 1, "ipaddr to start from")
 
 	flag.Parse()
 	num := *numPtr
 	start := *startPtr
-	fmt.Printf("Joining %d servers starting at %d!\n", num, start)
+
+	low := (1 + start) % 256
+	middle := ((1 + start) / 256) % 256
+	high := ((1 + start) / (256 * 256)) % 256
+	startaddr = fmt.Sprintf("127.%d.%d.%d:8888", high, middle, low)
+
+	fmt.Printf("Joining %d server starting at %s!\n", 1, startaddr)
 
 	list := make([]*fs.FileSystem, num)
-	if start == 8888 {
-
+	if start == 1 {
 		me := new(fs.FileSystem)
-		startaddr = fmt.Sprintf("127.0.0.1:%d", start)
-		me = fs.Create(fmt.Sprintf("/home/cbocovic/FS/%d/", start), startaddr)
+		me = fs.Create(fmt.Sprintf("FS/%d", start), startaddr)
 		list[0] = me
-		fs.Store(sha256.Sum256([]byte("WOOO")), "/home/cbocovic/index.php", fmt.Sprintf("127.0.0.1:%d", start))
 	} else {
 		me := new(fs.FileSystem)
-		startaddr = fmt.Sprintf("127.0.0.1:%d", start)
-		me = fs.Join(fmt.Sprintf("/home/cbocovic/FS/%d/", start), startaddr, "127.0.0.1:8888")
+		me = fs.Join(fmt.Sprintf("FS/%d", start), startaddr, "127.0.0.2:8888")
 		list[0] = me
 	}
 
@@ -43,8 +45,13 @@ func main() {
 		//join node to network or start a new network
 		time.Sleep(time.Second)
 		node := new(fs.FileSystem)
-		addr := fmt.Sprintf("127.0.0.1:%d", start+i)
-		node = fs.Join(fmt.Sprintf("/home/cbocovic/FS/%d/", start+i), addr, startaddr)
+		low := (1 + start + i) % 256
+		middle := ((1 + start + i) / 256) % 256
+		high := ((1 + start + i) / (256 * 256)) % 256
+		addr := fmt.Sprintf("127.%d.%d.%d:8888", high, middle, low)
+
+		fmt.Printf("Joining %d server starting at %s!\n", 1, addr)
+		node = fs.Join(fmt.Sprintf("FS/%d", start), addr, startaddr)
 		list[i] = node
 		fmt.Printf("Joined server: %s.\n", addr)
 	}
@@ -52,7 +59,7 @@ func main() {
 Loop:
 	for {
 		var cmd string
-		var port int
+		var index int
 		_, err := fmt.Scan(&cmd)
 		switch {
 		case cmd == "info":
@@ -63,22 +70,20 @@ Loop:
 			}
 		case cmd == "fingers":
 			//print out finger table
-			fmt.Printf("Enter port of desired node: ")
-			fmt.Scan(&port)
-			if port-start >= 0 && port-start < len(list) {
-				node := list[port-start]
+			fmt.Printf("Enter index of desired node: ")
+			fmt.Scan(&index)
+			if index >= 0 && index < len(list) {
+				node := list[index]
 				fmt.Printf("\n%s", node.ShowFingers())
 			}
 		case cmd == "succ":
 			//print out successor list
-			fmt.Printf("Enter port of desired node: ")
-			fmt.Scan(&port)
-			if port-start >= 0 && port-start < len(list) {
-				node := list[port-start]
+			fmt.Printf("Enter index of desired node: ")
+			fmt.Scan(&index)
+			if index >= 0 && index < len(list) {
+				node := list[index]
 				fmt.Printf("\n%s", node.ShowSucc())
 			}
-		case cmd == "fetch":
-			fs.Fetch(sha256.Sum256([]byte("WOOO")), "tmp.out", fmt.Sprintf("127.0.0.1:%d", start))
 		case err == io.EOF:
 			break Loop
 		}

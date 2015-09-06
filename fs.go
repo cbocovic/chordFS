@@ -22,12 +22,13 @@ type FileSystem struct {
 
 	//testing purposes only
 	malicious bool
+	cache     map[string]bool
 }
 
 //error checking function
 func checkError(err error) {
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Fatal error: %s\n", err.Error())
+		fmt.Fprintf(os.Stderr, " chordFS: Fatal error: %s\n", err.Error())
 	}
 }
 
@@ -52,6 +53,7 @@ func Create(home string, addr string) *FileSystem {
 	me.node.Register(code, me)
 	//experimental
 	me.malicious = false
+	me.cache = make(map[string]bool)
 	return me
 }
 
@@ -76,6 +78,7 @@ func Join(home string, myaddr string, addr string) *FileSystem {
 	me.node.Register(code, me)
 	//experimental
 	me.malicious = false
+	me.cache = make(map[string]bool)
 	return me
 }
 
@@ -105,6 +108,7 @@ func Extend(home string, addr string, node *chord.ChordNode) *FileSystem {
 func (me *FileSystem) Notify(id [sha256.Size]byte, myid [sha256.Size]byte, addr string) {
 	//fmt.Printf("FS %s notified!\n", me.addr)
 	dir, err := os.Open(me.home)
+	defer dir.Close()
 	checkError(err)
 	if err != nil {
 		return
@@ -128,6 +132,7 @@ func (me *FileSystem) Notify(id [sha256.Size]byte, myid [sha256.Size]byte, addr 
 		copy(key[:], decoded[:sha256.Size])
 		if chord.InRange(id, key, myid) {
 			//transfer file.
+			me.cache[name] = true
 			file, err := os.Open(fmt.Sprintf("%s/%s", me.home, name))
 			checkError(err)
 			if err != nil {
@@ -191,6 +196,7 @@ func Store(key [sha256.Size]byte, path string, addr string) error {
 	if err != nil {
 		fmt.Printf("error here (2)\n")
 	}
+	fmt.Printf("Stored file at %s.\n", ipaddr)
 
 	return err
 
@@ -251,6 +257,16 @@ func (me *FileSystem) load(key [sha256.Size]byte) ([]byte, error) {
 	document := make([]byte, 4096)
 	name := base32.StdEncoding.EncodeToString(key[:])
 	file, err := os.Open(fmt.Sprintf("%s/%s", me.home, name))
+	if _, ok := me.cache[name]; ok {
+		log, _ := os.OpenFile("results.log", os.O_APPEND|os.O_WRONLY, 0666)
+		log.Write([]byte("Retrieved from cache.\n"))
+		log.Close()
+	} else {
+		log, _ := os.OpenFile("results.log", os.O_APPEND|os.O_WRONLY, 0666)
+		log.Write([]byte("Retrieved from regular storage.\n"))
+		log.Close()
+	}
+
 	defer file.Close()
 	checkError(err)
 	if err != nil {
