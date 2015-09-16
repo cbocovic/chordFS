@@ -1,9 +1,11 @@
 package main
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
 	"flag"
 	"fmt"
-	//"github.com/cbocovic/chord"
+	"github.com/cbocovic/chord"
 	"github.com/cbocovic/chordFS"
 	"io"
 	//"runtime"
@@ -60,6 +62,7 @@ Loop:
 	for {
 		var cmd string
 		var index int
+		var ipaddr string
 		_, err := fmt.Scan(&cmd)
 		switch {
 		case cmd == "info":
@@ -86,6 +89,19 @@ Loop:
 			}
 		case err == io.EOF:
 			break Loop
+		case cmd == "lookup":
+			var key [sha256.Size]byte
+			fmt.Printf("Enter ipaddr of valid node: ")
+			fmt.Scan(&ipaddr)
+			rkey := make([]byte, sha256.Size)
+			io.ReadFull(rand.Reader, rkey)
+			copy(key[:], rkey)
+			addr, err := chord.Lookup(key, ipaddr)
+			if err != nil {
+				fmt.Printf("Fatal error.%s\n.", err.Error())
+			} else {
+				fmt.Printf("Found key at %s.\n", addr)
+			}
 		}
 
 	}
