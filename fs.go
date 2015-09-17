@@ -58,9 +58,11 @@ func Create(home string, addr string) *FileSystem {
 }
 
 func Join(home string, myaddr string, addr string) *FileSystem {
+	var err error
 	me := new(FileSystem)
-	me.node = chord.Join(myaddr, addr)
-	if me.node == nil {
+	me.node, err = chord.Join(myaddr, addr)
+	if err != nil {
+		checkError(err)
 		return nil
 	}
 
@@ -68,7 +70,7 @@ func Join(home string, myaddr string, addr string) *FileSystem {
 	me.mirror = fmt.Sprintf("%s/mirrored", home)
 	me.addr = myaddr
 
-	err := os.MkdirAll(me.home, 0755)
+	err = os.MkdirAll(me.home, 0755)
 	err = os.MkdirAll(me.mirror, 0755)
 	fmt.Printf("made directory %s.\n", me.home)
 	if err != nil {
@@ -292,8 +294,8 @@ func (fs *FileSystem) Finalize() {
 
 /** Printouts of information **/
 
-func (fs *FileSystem) Info() string {
-	return fs.node.Info()
+func (fs *FileSystem) String() string {
+	return fs.node.String()
 }
 
 func (fs *FileSystem) ShowFingers() string {

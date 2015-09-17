@@ -35,10 +35,10 @@ func main() {
 		cmd.Run()
 		servers[i-299] = uint(i)
 	}
-	fmt.Printf("Joined 10 servers. Sleeping now for 10 minutes.\n")
+	fmt.Printf("Joined 10 servers. Sleeping now for 5 minutes.\n")
 
 	//wait for stabilization
-	time.Sleep(10 * time.Minute)
+	time.Sleep(5 * time.Minute)
 	log, _ := os.Create("results.log")
 	log.Close()
 
@@ -72,7 +72,7 @@ func main() {
 		for i := 0; i < 5; i++ {
 			fmt.Printf("Leaving server %d of 5.\n", i+1)
 			var randomServer uint32
-			var randomServer2 uint32
+			var newServer2 uint32
 			binary.Read(rand.Reader, binary.LittleEndian, &randomServer)
 			randomServer = randomServer % 10
 			app := "screen"
@@ -86,17 +86,27 @@ func main() {
 			fmt.Printf("Server %d just left.\n", servers[randomServer])
 			fmt.Printf("Joining server %d of 5.\n", i+1)
 
-			binary.Read(rand.Reader, binary.LittleEndian, &randomServer2)
-			randomServer2 = randomServer2 % 10000000
+			//join to existing server
+			existingAddr := servers[(randomServer+1)%10]
+			low := (1 + existingAddr) % 256
+			middle := ((1 + existingAddr) / 256) % 256
+			high := ((1 + existingAddr) / (256 * 256)) % 256
+			existingIpAddr := fmt.Sprintf("127.%d.%d.%d:8888", high, middle, low)
+
+			//choose new ip address
+			binary.Read(rand.Reader, binary.LittleEndian, &newServer2)
+			newServer2 = newServer2 % 10000000
 			app = "screen"
 			arg0 = "-dmS"
-			arg1 = fmt.Sprintf("%d-tests", randomServer2)
+			arg1 = fmt.Sprintf("%d-tests", newServer2)
 			arg2 = "./tests"
 			arg3 = "-start"
-			arg4 = fmt.Sprintf("%d", randomServer2)
-			cmd = exec.Command(app, arg0, arg1, arg2, arg3, arg4)
+			arg4 = fmt.Sprintf("%d", newServer2)
+			arg5 := "-jointo"
+			arg6 := existingIpAddr
+			cmd = exec.Command(app, arg0, arg1, arg2, arg3, arg4, arg5, arg6)
 			cmd.Run()
-			servers[uint(randomServer)] = uint(randomServer2)
+			servers[uint(randomServer)] = uint(newServer2)
 			fmt.Printf("Server %d just joined.\n", servers[randomServer])
 
 		}

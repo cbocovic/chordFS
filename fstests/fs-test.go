@@ -20,10 +20,12 @@ func main() {
 	//set up flags
 	numPtr := flag.Int("num", 1, "the size of the DHT you wish to test")
 	startPtr := flag.Int("start", 1, "ipaddr to start from")
+	jointoPtr := flag.String("jointo", "127.0.0.2:8888", "existing ipaddr to join to")
 
 	flag.Parse()
 	num := *numPtr
 	start := *startPtr
+	jointo := *jointoPtr
 
 	low := (1 + start) % 256
 	middle := ((1 + start) / 256) % 256
@@ -39,7 +41,7 @@ func main() {
 		list[0] = me
 	} else {
 		me := new(fs.FileSystem)
-		me = fs.Join(fmt.Sprintf("FS/%d", start), startaddr, "127.0.0.2:8888")
+		me = fs.Join(fmt.Sprintf("FS/%d", start), startaddr, jointo)
 		list[0] = me
 	}
 
@@ -69,7 +71,7 @@ Loop:
 			//print out successors and predecessors
 			fmt.Printf("Node\t\t Successor\t\t Predecessor\n")
 			for _, node := range list {
-				fmt.Printf("%s\n", node.Info())
+				fmt.Printf("%s\n", node.String())
 			}
 		case cmd == "fingers":
 			//print out finger table
