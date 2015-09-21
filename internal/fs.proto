@@ -1,4 +1,4 @@
-package fs;
+package fsMsgs;
 
 message StoreMessage {
 	required string key = 1;

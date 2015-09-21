@@ -1,21 +1,22 @@
-package fs
+package chordfs
 
 import (
 	"crypto/sha256"
 	"fmt"
+	"github.com/cbocovic/chordFS/internal"
 	"github.com/golang/protobuf/proto"
 	"log"
 )
 
 func getstoreMsg(key [sha256.Size]byte, document []byte) []byte {
 
-	msg := new(NetworkMessage)
+	msg := new(fsMsgs.NetworkMessage)
 	msg.Proto = proto.Uint32(2)
-	appMsg := new(AppMessage)
-	fsMsg := new(AppMessage_FileSystemMessage)
-	command := AppMessage_Command(AppMessage_Command_value["STORE"])
+	appMsg := new(fsMsgs.AppMessage)
+	fsMsg := new(fsMsgs.AppMessage_FileSystemMessage)
+	command := fsMsgs.AppMessage_Command(fsMsgs.AppMessage_Command_value["STORE"])
 	fsMsg.Cmd = &command
-	storeMsg := new(StoreMessage)
+	storeMsg := new(fsMsgs.StoreMessage)
 	storeMsg.Key = proto.String(string(key[:sha256.Size]))
 	storeMsg.Document = proto.String(string(document))
 	fsMsg.Smsg = storeMsg
@@ -37,13 +38,13 @@ func getstoreMsg(key [sha256.Size]byte, document []byte) []byte {
 
 func getfetchMsg(key [sha256.Size]byte) []byte {
 
-	msg := new(NetworkMessage)
+	msg := new(fsMsgs.NetworkMessage)
 	msg.Proto = proto.Uint32(2)
-	appMsg := new(AppMessage)
-	fsMsg := new(AppMessage_FileSystemMessage)
-	command := AppMessage_Command(AppMessage_Command_value["FETCH"])
+	appMsg := new(fsMsgs.AppMessage)
+	fsMsg := new(fsMsgs.AppMessage_FileSystemMessage)
+	command := fsMsgs.AppMessage_Command(fsMsgs.AppMessage_Command_value["FETCH"])
 	fsMsg.Cmd = &command
-	fetchMsg := new(FetchMessage)
+	fetchMsg := new(fsMsgs.FetchMessage)
 	fetchMsg.Key = proto.String(string(key[:sha256.Size]))
 	fsMsg.Fmsg = fetchMsg
 	appMsg.Msg = fsMsg
@@ -63,7 +64,7 @@ func getfetchMsg(key [sha256.Size]byte) []byte {
 }
 
 func nullMsg() []byte {
-	msg := new(NetworkMessage)
+	msg := new(fsMsgs.NetworkMessage)
 	msg.Proto = proto.Uint32(2)
 
 	data, err := proto.Marshal(msg)
@@ -76,7 +77,7 @@ func nullMsg() []byte {
 
 func (fs *FileSystem) parseMessage(data []byte) []byte {
 
-	msg := new(AppMessage)
+	msg := new(fsMsgs.AppMessage)
 
 	err := proto.Unmarshal(data, msg)
 	checkError(err)
@@ -88,7 +89,7 @@ func (fs *FileSystem) parseMessage(data []byte) []byte {
 	fsmsg := msg.GetMsg()
 	cmd := int32(fsmsg.GetCmd())
 	switch {
-	case cmd == AppMessage_Command_value["FETCH"]:
+	case cmd == fsMsgs.AppMessage_Command_value["FETCH"]:
 		fmsg := fsmsg.GetFmsg()
 		var key [sha256.Size]byte
 		copy(key[:], []byte(fmsg.GetKey()))
@@ -102,13 +103,13 @@ func (fs *FileSystem) parseMessage(data []byte) []byte {
 			return nullMsg()
 		}
 		return getstoreMsg(key, doc)
-	case cmd == AppMessage_Command_value["STORE"]:
+	case cmd == fsMsgs.AppMessage_Command_value["STORE"]:
 		smsg := fsmsg.GetSmsg()
 		key := []byte(smsg.GetKey())
 		doc := []byte(smsg.GetDocument())
 		fs.save(key, doc)
 		return nullMsg()
-	case cmd == AppMessage_Command_value["MIRROR"]:
+	case cmd == fsMsgs.AppMessage_Command_value["MIRROR"]:
 		return nullMsg()
 	}
 	fmt.Printf("No matching commands.\n")
@@ -117,7 +118,7 @@ func (fs *FileSystem) parseMessage(data []byte) []byte {
 
 func parseDoc(data []byte) ([]byte, error) {
 
-	msg := new(AppMessage)
+	msg := new(fsMsgs.AppMessage)
 
 	err := proto.Unmarshal(data, msg)
 	checkError(err)
@@ -136,7 +137,7 @@ func parseDoc(data []byte) ([]byte, error) {
 //parseHeader strips the Chord overlay layer off the message
 func parseHeader(data []byte) ([]byte, error) {
 
-	msg := new(NetworkMessage)
+	msg := new(fsMsgs.NetworkMessage)
 
 	err := proto.Unmarshal(data, msg)
 	checkError(err)

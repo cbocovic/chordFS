@@ -1,11 +1,14 @@
-package fs
+/* Package fs
+
+is a file system application to be run on top of a Chord DHT.
+*/
+package chordfs
 
 import (
 	"crypto/sha256"
+	"encoding/base32"
 	"fmt"
 	"github.com/cbocovic/chord"
-	//"io"
-	"encoding/base32"
 	"os"
 )
 
@@ -25,6 +28,16 @@ type FileSystem struct {
 	cache     map[string]bool
 }
 
+type FSError struct {
+	Address string
+
+	Err error
+}
+
+func (e *FSError) Error() string {
+	return fmt.Sprintf("Failed to connect to peer: %s. Cause of failure: %s.", e.Address, e.Err)
+}
+
 //error checking function
 func checkError(err error) {
 	if err != nil {
@@ -32,6 +45,9 @@ func checkError(err error) {
 	}
 }
 
+//Create will start a new DHT with a file system application and returns the FileSystem struct.
+//The input home indicates the directory that will store distributed documents.
+//The input addr specifies which address the application will listen on.
 func Create(home string, addr string) *FileSystem {
 	me := new(FileSystem)
 	me.node = chord.Create(addr)
@@ -57,6 +73,10 @@ func Create(home string, addr string) *FileSystem {
 	return me
 }
 
+//Join will create a Chord node with a file system application and join to an existing DHT
+//specified by the address addr. It returns the resulting FileSystem struct.
+//The input home indicates the directory that will store distributed documents.
+//The input myaddr specifies which address the application will listen on.
 func Join(home string, myaddr string, addr string) *FileSystem {
 	var err error
 	me := new(FileSystem)
@@ -65,6 +85,7 @@ func Join(home string, myaddr string, addr string) *FileSystem {
 		checkError(err)
 		return nil
 	}
+	fmt.Printf("here\n")
 
 	me.home = home
 	me.mirror = fmt.Sprintf("%s/mirrored", home)
@@ -85,7 +106,7 @@ func Join(home string, myaddr string, addr string) *FileSystem {
 }
 
 //Extend is similar to Join and Create, but instead takes as argument
-//a ChordNode structure
+//an already created ChordNode structure
 func Extend(home string, addr string, node *chord.ChordNode) *FileSystem {
 	me := new(FileSystem)
 	me.node = node
@@ -106,10 +127,9 @@ func Extend(home string, addr string, node *chord.ChordNode) *FileSystem {
 }
 
 //Notify is part of the ChordApp interface and will update the
-//application if its predecessor changes
-func (me *FileSystem) Notify(id [sha256.Size]byte, myid [sha256.Size]byte, addr string) {
-	//fmt.Printf("FS %s notified!\n", me.addr)
-	dir, err := os.Open(me.home)
+//application by moving files if its predecessor changes
+func (fs *FileSystem) Notify(id [sha256.Size]byte, myid [sha256.Size]byte, addr string) {
+	dir, err := os.Open(fs.home)
 	defer dir.Close()
 	checkError(err)
 	if err != nil {
@@ -122,9 +142,7 @@ func (me *FileSystem) Notify(id [sha256.Size]byte, myid [sha256.Size]byte, addr 
 		return
 	}
 
-	//fmt.Printf("FS %s has %d files.\n", me.addr, len(names))
 	for _, name := range names {
-		//fmt.Printf("FS %s found file %s.\n", me.addr, name)
 		var key [sha256.Size]byte
 		decoded, err := base32.StdEncoding.DecodeString(name)
 		if err != nil {
@@ -134,8 +152,8 @@ func (me *FileSystem) Notify(id [sha256.Size]byte, myid [sha256.Size]byte, addr 
 		copy(key[:], decoded[:sha256.Size])
 		if chord.InRange(id, key, myid) {
 			//transfer file.
-			me.cache[name] = true
-			file, err := os.Open(fmt.Sprintf("%s/%s", me.home, name))
+			fs.cache[name] = true
+			file, err := os.Open(fmt.Sprintf("%s/%s", fs.home, name))
 			checkError(err)
 			if err != nil {
 				checkError(err)
@@ -172,7 +190,7 @@ func (fs *FileSystem) Message(data []byte) []byte {
 //contacting the node at addr
 func Store(key [sha256.Size]byte, path string, addr string) error {
 	//do a lookup of the key
-	//fmt.Printf("storing key %x... \n", key)
+	fmt.Printf("storing key %x... \n", key)
 	ipaddr, err := chord.Lookup(key, addr)
 
 	file, err := os.Open(path)
@@ -208,21 +226,38 @@ func Store(key [sha256.Size]byte, path string, addr string) error {
 //save it to path by contacting the node at addr
 func Fetch(key [sha256.Size]byte, path string, addr string) error {
 	ipaddr, err := chord.Lookup(key, addr)
+	if err != nil {
+		fmt.Printf("Error (*) in fetch: %s.\n", err.Error())
+		return err
+	}
 
 	//create message to send to target ip
 	msg := getfetchMsg(key)
 
 	reply, err := chord.Send(msg, ipaddr)
 	if err != nil {
+		fmt.Printf("Error (*) in fetch: %s.\n", err.Error())
 		return err
 	}
 
 	reply, err = parseHeader(reply)
 	if err != nil {
+		fmt.Printf("Error (*) in fetch: %s.\n", err.Error())
 		return err
 	}
+	if reply == nil {
+		fmt.Printf("Error in fetch: Document was not (1) present at %s.\n", ipaddr)
+		return err
+	}
+
 	document, err := parseDoc(reply)
 	if err != nil {
+		fmt.Printf("Error (*) in fetch: %s.\n", err.Error())
+		return err
+	}
+	if document == nil {
+		name := base32.StdEncoding.EncodeToString(key[:])
+		fmt.Printf("Error in fetch: Document %s was not present at %s.\n", name, ipaddr)
 		return err
 	}
 
@@ -286,8 +321,9 @@ func (me *FileSystem) load(key [sha256.Size]byte) ([]byte, error) {
 	return document[:n], nil
 }
 
-//exits cleanly (removes all files for now)
+//Allos the FileSystem to exit cleanly (removes all files for now)
 func (fs *FileSystem) Finalize() {
+	os.Remove(fs.home)
 	fs.node.Finalize()
 
 }

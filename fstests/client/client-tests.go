@@ -16,7 +16,7 @@ func main() {
 	//First, join 1000 servers
 	servers := make([]uint, 10)
 	app := "screen"
-	arg0 := "-dmS"
+	arg0 := "-dmSL"
 	arg1 := "1-tests"
 	arg2 := "./tests"
 	arg3 := "-start"
@@ -26,7 +26,7 @@ func main() {
 	servers[0] = 1
 	for i := 300; i < 309; i++ {
 		app := "screen"
-		arg0 := "-dmS"
+		arg0 := "-dmSL"
 		arg1 := fmt.Sprintf("%d-tests", i)
 		arg2 := "./tests"
 		arg3 := "-start"
@@ -38,7 +38,7 @@ func main() {
 	fmt.Printf("Joined 10 servers. Sleeping now for 5 minutes.\n")
 
 	//wait for stabilization
-	time.Sleep(5 * time.Minute)
+	time.Sleep(10 * time.Minute)
 	log, _ := os.Create("results.log")
 	log.Close()
 
@@ -97,7 +97,7 @@ func main() {
 			binary.Read(rand.Reader, binary.LittleEndian, &newServer2)
 			newServer2 = newServer2 % 10000000
 			app = "screen"
-			arg0 = "-dmS"
+			arg0 = "-dmSL"
 			arg1 = fmt.Sprintf("%d-tests", newServer2)
 			arg2 = "./tests"
 			arg3 = "-start"
@@ -125,11 +125,14 @@ func main() {
 			middle := ((1 + raddr) / 256) % 256
 			high := ((1 + raddr) / (256 * 256)) % 256
 			randaddr := fmt.Sprintf("127.%d.%d.%d:8888", high, middle, low)
-			fs.Fetch(sha256.Sum256(files[i][:]), "fetched.txt", randaddr)
+			err := fs.Fetch(sha256.Sum256(files[i][:]), fmt.Sprintf("fetched-%d.txt", i), randaddr)
+			if err != nil {
+				fmt.Printf("Could not retrieve document. %s.\n", err.Error())
+			}
 		}
 
 		//delete all files
-		fmt.Printf("Deleting files...")
+		fmt.Printf("Deleting files...\n")
 		for _, server := range servers {
 			dir, _ := os.Open(fmt.Sprintf("FS/%d", server))
 
