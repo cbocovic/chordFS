@@ -130,6 +130,9 @@ func parseDoc(data []byte) ([]byte, error) {
 	fsmsg := msg.GetMsg()
 	smsg := fsmsg.GetSmsg()
 	doc := smsg.GetDocument()
+	if doc == "" {
+		return nil, nil
+	}
 	return []byte(doc), nil
 
 }

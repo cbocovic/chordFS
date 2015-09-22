@@ -29,13 +29,18 @@ type FileSystem struct {
 }
 
 type FSError struct {
-	Address string
-
-	Err error
+	address  string
+	filename string
+	Err      error
 }
 
 func (e *FSError) Error() string {
-	return fmt.Sprintf("Failed to connect to peer: %s. Cause of failure: %s.", e.Address, e.Err)
+	if e != nil {
+		return fmt.Sprintf("Failed to retrieve file %s:%s. Cause of failure: %s.", e.address, e.filename, e.Err)
+	} else {
+		return fmt.Sprintf("Failed to retrieve file %s:%s.", e.address, e.filename)
+	}
+
 }
 
 //error checking function
@@ -129,6 +134,7 @@ func Extend(home string, addr string, node *chord.ChordNode) *FileSystem {
 //Notify is part of the ChordApp interface and will update the
 //application by moving files if its predecessor changes
 func (fs *FileSystem) Notify(id [sha256.Size]byte, myid [sha256.Size]byte, addr string) {
+	fmt.Printf("Predecessor changed to %s.\n", addr)
 	dir, err := os.Open(fs.home)
 	defer dir.Close()
 	checkError(err)
@@ -175,8 +181,12 @@ func (fs *FileSystem) Notify(id [sha256.Size]byte, myid [sha256.Size]byte, addr 
 				checkError(err)
 			}
 
+			fmt.Printf("Relocated file %s to node %s.\n", name, addr)
+
 		}
 	}
+
+	//TODO: exchange mirrored files
 
 }
 
@@ -190,7 +200,6 @@ func (fs *FileSystem) Message(data []byte) []byte {
 //contacting the node at addr
 func Store(key [sha256.Size]byte, path string, addr string) error {
 	//do a lookup of the key
-	fmt.Printf("storing key %x... \n", key)
 	ipaddr, err := chord.Lookup(key, addr)
 
 	file, err := os.Open(path)
@@ -216,7 +225,6 @@ func Store(key [sha256.Size]byte, path string, addr string) error {
 	if err != nil {
 		fmt.Printf("error here (2)\n")
 	}
-	fmt.Printf("Stored file at %s.\n", ipaddr)
 
 	return err
 
@@ -227,7 +235,9 @@ func Store(key [sha256.Size]byte, path string, addr string) error {
 func Fetch(key [sha256.Size]byte, path string, addr string) error {
 	ipaddr, err := chord.Lookup(key, addr)
 	if err != nil {
-		fmt.Printf("Error (*) in fetch: %s.\n", err.Error())
+		name := base32.StdEncoding.EncodeToString(key[:])
+		err = &FSError{ipaddr, name, err}
+		fmt.Printf("%s.\n", err.Error())
 		return err
 	}
 
@@ -236,28 +246,37 @@ func Fetch(key [sha256.Size]byte, path string, addr string) error {
 
 	reply, err := chord.Send(msg, ipaddr)
 	if err != nil {
-		fmt.Printf("Error (*) in fetch: %s.\n", err.Error())
+		name := base32.StdEncoding.EncodeToString(key[:])
+		err = &FSError{ipaddr, name, err}
+		fmt.Printf("%s.\n", err.Error())
 		return err
 	}
 
 	reply, err = parseHeader(reply)
 	if err != nil {
-		fmt.Printf("Error (*) in fetch: %s.\n", err.Error())
+		name := base32.StdEncoding.EncodeToString(key[:])
+		err = &FSError{ipaddr, name, err}
+		fmt.Printf("%s.\n", err.Error())
 		return err
 	}
 	if reply == nil {
-		fmt.Printf("Error in fetch: Document was not (1) present at %s.\n", ipaddr)
+		name := base32.StdEncoding.EncodeToString(key[:])
+		err = &FSError{ipaddr, name, err}
+		fmt.Printf("%s.\n", err.Error())
 		return err
 	}
 
 	document, err := parseDoc(reply)
 	if err != nil {
-		fmt.Printf("Error (*) in fetch: %s.\n", err.Error())
+		name := base32.StdEncoding.EncodeToString(key[:])
+		err = &FSError{ipaddr, name, err}
+		fmt.Printf("%s.\n", err.Error())
 		return err
 	}
 	if document == nil {
 		name := base32.StdEncoding.EncodeToString(key[:])
-		fmt.Printf("Error in fetch: Document %s was not present at %s.\n", name, ipaddr)
+		err = &FSError{ipaddr, name, err}
+		fmt.Printf("%s.\n", err.Error())
 		return err
 	}
 
@@ -267,13 +286,11 @@ func Fetch(key [sha256.Size]byte, path string, addr string) error {
 		return err
 	}
 	defer file.Close()
-	fmt.Printf("Writing to file... ")
 	_, err = file.Write(document)
 	checkError(err)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("done.\n")
 
 	return err
 
@@ -294,28 +311,32 @@ func (me *FileSystem) save(key []byte, document []byte) {
 //loads a file from the node's home directory
 func (me *FileSystem) load(key [sha256.Size]byte) ([]byte, error) {
 
+	log, _ := os.OpenFile("results.log", os.O_APPEND|os.O_WRONLY, 0666) //experiments
+	defer log.Close()
+
 	document := make([]byte, 4096)
 	name := base32.StdEncoding.EncodeToString(key[:])
+
 	file, err := os.Open(fmt.Sprintf("%s/%s", me.home, name))
-	if _, ok := me.cache[name]; ok {
-		log, _ := os.OpenFile("results.log", os.O_APPEND|os.O_WRONLY, 0666)
-		log.Write([]byte("Retrieved from cache.\n"))
-		log.Close()
-	} else {
-		log, _ := os.OpenFile("results.log", os.O_APPEND|os.O_WRONLY, 0666)
-		log.Write([]byte("Retrieved from regular storage.\n"))
-		log.Close()
-	}
 
 	defer file.Close()
 	checkError(err)
 	if err != nil {
+		log.Write([]byte("File missing.\n"))
 		return document, err
 	}
 	n, err := file.Read(document)
 	checkError(err)
 	if err != nil {
+		log.Write([]byte("File missing.\n"))
 		return document, err
+	}
+
+	//experiments
+	if _, ok := me.cache[name]; ok {
+		log.Write([]byte("Retrieved from cache.\n"))
+	} else {
+		log.Write([]byte("Retrieved from regular storage.\n"))
 	}
 
 	return document[:n], nil

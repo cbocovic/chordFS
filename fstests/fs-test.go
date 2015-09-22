@@ -32,16 +32,16 @@ func main() {
 	high := ((1 + start) / (256 * 256)) % 256
 	startaddr = fmt.Sprintf("127.%d.%d.%d:8888", high, middle, low)
 
-	fmt.Printf("Joining %d server starting at %s!\n", 1, startaddr)
+	fmt.Printf("WOOO Joining %d server starting at %s!\n", 1, startaddr)
 
 	list := make([]*chordfs.FileSystem, num)
 	if start == 1 {
 		me := new(chordfs.FileSystem)
-		me = chordfs.Create(fmt.Sprintf("FS/%d", start), startaddr)
+		me = chordfs.Create(fmt.Sprintf("FS/%s", startaddr), startaddr)
 		list[0] = me
 	} else {
 		me := new(chordfs.FileSystem)
-		me = chordfs.Join(fmt.Sprintf("FS/%d", start), startaddr, jointo)
+		me = chordfs.Join(fmt.Sprintf("FS/%s", startaddr), startaddr, jointo)
 		list[0] = me
 	}
 
@@ -55,7 +55,7 @@ func main() {
 		addr := fmt.Sprintf("127.%d.%d.%d:8888", high, middle, low)
 
 		fmt.Printf("Joining %d server starting at %s!\n", 1, addr)
-		node = chordfs.Join(fmt.Sprintf("FS/%d", start), addr, startaddr)
+		node = chordfs.Join(fmt.Sprintf("FS/%s", addr), addr, startaddr)
 		list[i] = node
 		fmt.Printf("Joined server: %s.\n", addr)
 	}
